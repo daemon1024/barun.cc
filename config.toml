@@ -1,0 +1,55 @@
+baseURL = "https://barun.cc"
+title = "Barun Acharya"
+theme = "gokarna"
+languageCode = "en"
+defaultContentLanguage = "en"
+enableEmoji = true
+enableRobotsTXT = true
+
+# Choose one of emacs, trac or perldoc
+pygmentsStyle = "monokai"
+
+[params]
+  footer = "Barun Acharya"
+  description = "Sky above, sand below and peace within"
+  avatarURL = "/images/avatar.webp"
+  avatarSize = "size-m"
+  socialIcons = [
+    {name = "github", url = "https://github.com/daemon1024/"},
+    {name = "twitter", url = "https://twitter.com/daemon1024/"},
+    {name = "linkedin", url = "https://linkedin.com/in/barun-acharya/"}
+  ]
+  metaKeywords = ["blog", "developer", "personal"]
+
+[menu]
+  [[menu.main]]
+    name = "Home"
+    url = "/"
+    weight = 1
+
+  [[menu.main]]
+    name = "Posts"
+    url = "/posts/"
+    weight = 2
+
+  [[menu.main]]
+    name = "Projects"
+    url = "/projects/"
+    weight = 3
+
+  [[menu.main]]
+    name = "About"
+    url = "/about"
+    weight = 4
+
+  [[menu.main]]
+    identifier = "github"
+    pre = "<span data-feather='github'></span>"
+    url = "https://github.com/daemon1024"
+    weight = 5
+
+  [[menu.main]]
+    identifier = "rss"
+    pre = "<span data-feather='rss'></span>"
+    url = "/index.xml"
+    weight = 7
