@@ -10,14 +10,14 @@ enableRobotsTXT = true
 pygmentsStyle = "monokai"
 
 [params]
-  title = "Hi, I am Barun a.k.a daemon1024 👋"
+  title = "Hey, I am Barun a.k.a daemon1024 👋"
   footer = "Barun Acharya"
   socialIcons = [
     {name = "github", url = "https://github.com/daemon1024/"},
     {name = "twitter", url = "https://twitter.com/daemon1024/"},
-    {name = "linkedin", url = "https://linkedin.com/in/barun-acharya/"}
+    {name = "linkedin", url = "https://linkedin.com/in/barun-acharya/"},
   ]
-  showPostsOnHomePage = "popular"
+  showPostsOnHomePage = "recent"
   metaKeywords = ["blog", "developer", "personal"]
 
 [menu]
