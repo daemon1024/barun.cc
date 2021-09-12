@@ -17,8 +17,8 @@ pygmentsStyle = "monokai"
     {name = "twitter", url = "https://twitter.com/daemon1024/"},
     {name = "linkedin", url = "https://linkedin.com/in/barun-acharya/"},
   ]
-  showPostsOnHomePage = "recent"
-  metaKeywords = ["blog", "developer", "personal"]
+  showPostsOnHomePage = "popular"
+  metaKeywords = ["blog", "developer", "personal", "daemon1024", "barun"]
 
 [menu]
   [[menu.main]]

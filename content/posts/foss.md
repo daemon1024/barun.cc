@@ -4,6 +4,7 @@ title = "Free vs Open-Source Software"
 slug = "free vs oss"
 tags = ["FOSS", "Open Source", "Free Software"]
 type = "post"
+weight = 5
 +++
 
 Softwares are a integral part of our lifestyle right now. Some of them are proprietary and some of them are not. The one's which are not proprietary are generally associated with **FOSS** i.e. _Free_ and _Open Source Software_. Let's dig a bit deeper into the non proprietary world.
