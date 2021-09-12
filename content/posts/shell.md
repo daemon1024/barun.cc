@@ -2,7 +2,7 @@
 date = "2020-07-24"
 title = "Basic Shell commands and How do they execute?"
 slug = "Basic Shell commands and How do they execute?" 
-tags = ["Shell", "Open Source", "Bash", "Linux", "Unix"]
+tags = ["Shell", "Bash", "Linux", "Unix"]
 type = "post"
 +++
 

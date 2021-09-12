@@ -2,7 +2,7 @@
 date = "2020-11-01"
 title = "File Descriptors and Resource Usage Limits"
 slug = "File Descriptors and Resource Usage Limits" 
-tags = ["Shell", "Open Source", "Bash", "Linux", "Unix", "ulimit", "File Descriptors", "System Resources"]
+tags = ["Shell", "Bash", "Linux", "Unix", "ulimit", "File Descriptors", "System Resources"]
 type = "post"
 +++
 
