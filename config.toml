@@ -10,15 +10,14 @@ enableRobotsTXT = true
 pygmentsStyle = "monokai"
 
 [params]
+  title = "Hi, I am Barun a.k.a daemon1024 👋"
   footer = "Barun Acharya"
-  description = "Work in Progress Right Now ^_^"
-  avatarURL = "/images/avatar.webp"
-  avatarSize = "size-m"
   socialIcons = [
     {name = "github", url = "https://github.com/daemon1024/"},
     {name = "twitter", url = "https://twitter.com/daemon1024/"},
     {name = "linkedin", url = "https://linkedin.com/in/barun-acharya/"}
   ]
+  showPostsOnHomePage = "popular"
   metaKeywords = ["blog", "developer", "personal"]
 
 [menu]
@@ -28,18 +27,18 @@ pygmentsStyle = "monokai"
     weight = 1
 
   [[menu.main]]
+    name = "About"
+    url = "/about"
+    weight = 2
+
+  [[menu.main]]
     name = "Posts"
     url = "/posts/"
-    weight = 2
+    weight = 3
 
   [[menu.main]]
     name = "Projects"
     url = "/projects/"
-    weight = 3
-
-  [[menu.main]]
-    name = "About"
-    url = "/about"
     weight = 4
 
   [[menu.main]]
@@ -52,4 +51,4 @@ pygmentsStyle = "monokai"
     identifier = "rss"
     pre = "<span data-feather='rss'></span>"
     url = "/index.xml"
-    weight = 7
+    weight = 6
