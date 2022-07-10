@@ -1,8 +1,6 @@
 ## Hey there, I'm Barun 👋
 
-I am a undergraduate student working on some cool open-source projects.
-
-Currently, I am tinkering with - Infrastructure, Container Security and Cloud Native.
+I am a undergraduate student and I currently do Open Source stuff at Accuknox, mostly hacking on [KubeArmor](https://github.com/KubeArmor/).
 
 I have been involved with [Public Lab Code Community under Google Summer of Code '21](/posts/gsoc21)
 
@@ -10,7 +8,7 @@ You can usually find me lurking around at [Open Source Developers Community](htt
 
 If you want to check some of my stuff out then you can do that! at [Github Profile](https://github.com/daemon1024)
 
-I like to talk about { `Open Source`, `Community`, `Go`, `Javascript`, `Cloud`, `Web`, `Privacy`, `Linux`, `Anime`, `Mechanical Keyboards` }
+I like to talk about { `Open Source`, `Community`, `Go`, `Javascript`, `Cloud`, `Containers`, `Security`, `Web`, `Privacy`, `Linux`, `Anime`, `Mechanical Keyboards` }
 
 
 If you think I can help with anything, want me to join your project team or just want to say hi, you can reach out to me at:
