@@ -16,6 +16,7 @@ pygmentsStyle = "monokai"
     {name = "github", url = "https://github.com/daemon1024/"},
     {name = "twitter", url = "https://twitter.com/daemon1024/"},
     {name = "linkedin", url = "https://linkedin.com/in/barun-acharya/"},
+    {name = "mastodon", url = "https://hachyderm.io/@daemon1024", rel="me"},
   ]
   showPostsOnHomePage = "popular"
   metaKeywords = ["blog", "developer", "personal", "daemon1024", "barun"]
