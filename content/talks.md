@@ -2,6 +2,7 @@
 
 | Talk                                                                                                          | Event/Type                               | Date           | Links                                                |
 | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | -------------- | ---------------------------------------------------- |
+| Finding Imposter Among Us: Container Edition                                                                  | 📢 KCD Mumbai                             | June 2023      | [video](https://www.youtube.com/watch?v=HRbzNEllWUw) |
 | [Enlightning](https://tanzu.vmware.com/developer/tv/enlightning/) - Armoring up Your Workloads with KubeArmor | 📹🎙️ Whiteboard Live Stream Episode        | June 2022      | [video](https://www.youtube.com/watch?v=2ZVr64O8R-E) |
 | Armoring Cloud Native Workloads With LSM Superpowers                                                          | 📢 KubeCon + CloudNativeCon North America | October 2022   | [video](https://www.youtube.com/watch?v=8jXuBelV3-0) |
 | KubeArmor on Google Container Optimized OS                                                                    | 📹  Youtube Demo                          | September 2022 | [video](https://www.youtube.com/watch?v=9L28xhRl5u4) |
