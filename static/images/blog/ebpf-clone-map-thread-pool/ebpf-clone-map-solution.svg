@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="480" font-family="monospace, sans-serif" font-size="13">
+  <rect width="860" height="480" fill="white"/>
+
+  <!-- Title -->
+  <text x="430" y="30" text-anchor="middle" font-size="15" font-weight="bold" fill="#111">The Clone Map Solution</text>
+
+  <!-- kretprobe/sys_clone label -->
+  <rect x="30" y="50" width="220" height="40" rx="4" fill="#e8f5e9" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="140" y="66" text-anchor="middle" font-weight="bold" fill="#1B5E20">kretprobe/sys_clone</text>
+  <text x="140" y="82" text-anchor="middle" fill="#1B5E20" font-size="11">fires on each thread spawn</text>
+
+  <!-- clone_map -->
+  <rect x="310" y="40" width="220" height="130" rx="6" fill="#e8f5e9" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="420" y="62" text-anchor="middle" font-weight="bold" fill="#1B5E20">clone_map</text>
+  <text x="420" y="78" text-anchor="middle" fill="#1B5E20" font-size="11">LRU_HASH: child TID → parent TID</text>
+  <line x1="320" y1="88" x2="520" y2="88" stroke="#4CAF50" stroke-width="0.8"/>
+  <text x="420" y="104" text-anchor="middle" fill="#2E7D32">1002  →  1001</text>
+  <text x="420" y="120" text-anchor="middle" fill="#2E7D32">1003  →  1001</text>
+  <text x="420" y="136" text-anchor="middle" fill="#2E7D32">1004  →  1001</text>
+  <text x="420" y="155" text-anchor="middle" fill="#4CAF50" font-size="11">max_entries: 10240, auto-evict LRU</text>
+
+  <!-- Arrow from kretprobe to clone_map -->
+  <line x1="250" y1="68" x2="308" y2="100" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#arrowgreen)"/>
+  <text x="275" y="80" fill="#4CAF50" font-size="11">writes</text>
+
+  <!-- span_map -->
+  <rect x="600" y="40" width="220" height="110" rx="6" fill="#f3e5f5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="710" y="62" text-anchor="middle" font-weight="bold" fill="#4A148C">span_map</text>
+  <text x="710" y="78" text-anchor="middle" fill="#4A148C" font-size="11">TID → span_context</text>
+  <line x1="610" y1="88" x2="810" y2="88" stroke="#9C27B0" stroke-width="0.8"/>
+  <text x="710" y="104" text-anchor="middle" fill="#4A148C">1001 → {traceID, spanID}</text>
+  <text x="710" y="122" text-anchor="middle" fill="#9e9e9e">1002 → (miss)</text>
+
+  <!-- BPF Probe box -->
+  <rect x="30" y="230" width="760" height="165" rx="6" fill="#e3f2fd" stroke="#2196F3" stroke-width="1.5"/>
+  <text x="410" y="252" text-anchor="middle" font-weight="bold" fill="#0D47A1" font-size="14">eBPF Log Capture Probe  (on sys_enter_write)</text>
+
+  <!-- Pseudocode steps -->
+  <text x="55" y="278" fill="#1565C0" font-size="12">1.  tid = bpf_get_current_pid_tgid() &amp; 0xFFFFFFFF</text>
+  <text x="55" y="298" fill="#1565C0" font-size="12">2.  span = span_map.lookup(tid)          // direct hit?</text>
+  <text x="55" y="318" fill="#2E7D32" font-size="12">3.  if !span: walk clone_map up to 5 levels</text>
+  <text x="75" y="336" fill="#2E7D32" font-size="12">      parent = clone_map.lookup(tid)</text>
+  <text x="75" y="354" fill="#2E7D32" font-size="12">      span   = span_map.lookup(parent)  // parent's span</text>
+  <text x="55" y="376" fill="#555" font-size="12">4.  emit log event with span context (or without if still nil)</text>
+
+  <!-- Arrow: write() from Worker thread down to probe -->
+  <rect x="30" y="170" width="140" height="45" rx="4" fill="#fff3e0" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="100" y="189" text-anchor="middle" font-weight="bold" fill="#E65100">Worker B</text>
+  <text x="100" y="207" text-anchor="middle" fill="#E65100">TID: 1002</text>
+
+  <line x1="100" y1="215" x2="100" y2="228" stroke="#FF9800" stroke-width="1.5" marker-end="url(#arroworange)"/>
+  <text x="115" y="225" fill="#FF9800" font-size="11">write()</text>
+
+  <!-- Arrow from probe walk to clone_map -->
+  <line x1="410" y1="230" x2="420" y2="172" stroke="#4CAF50" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowgreen)"/>
+  <text x="435" y="205" fill="#4CAF50" font-size="11">lookup parent</text>
+
+  <!-- Arrow from probe span lookup to span_map -->
+  <line x1="650" y1="230" x2="710" y2="152" stroke="#9C27B0" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowpurple)"/>
+  <text x="695" y="200" fill="#9C27B0" font-size="11">span hit!</text>
+
+  <!-- Caption -->
+  <text x="430" y="420" text-anchor="middle" fill="#757575" font-size="11">kretprobe/sys_clone records child→parent TID on every thread spawn.</text>
+  <text x="430" y="437" text-anchor="middle" fill="#757575" font-size="11">When a worker's TID misses the span_map, the probe walks clone_map to find an ancestor with an active span.</text>
+  <text x="430" y="454" text-anchor="middle" fill="#757575" font-size="11">Bounded to 5 hops — verifier-safe, covers all real thread pool depths.</text>
+
+  <defs>
+    <marker id="arrowgreen" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4CAF50"/>
+    </marker>
+    <marker id="arrowpurple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#9C27B0"/>
+    </marker>
+    <marker id="arroworange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#FF9800"/>
+    </marker>
+  </defs>
+</svg>
