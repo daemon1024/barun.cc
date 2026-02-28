@@ -6,41 +6,86 @@ tags = ["ebpf", "thread-pools", "context-propagation", "observability"]
 type = "post"
 +++
 
-When you build an eBPF-based log capture tool, you quickly run into a wall: thread pools.
+Thread pools break a surprising number of eBPF-based observability tools. Not because the tools are badly designed — but because of a fundamental mismatch between how Linux models threads and how distributed tracing models work.
 
-The basic design is simple. You attach a tracepoint on `sys_enter_write`, intercept log output before it hits the filesystem, look up the calling thread's active span context from a BPF map, and attach that context to the log record. Automatic log-trace correlation with zero application changes.
+The fix is a pattern I've started calling the **clone map**: a lightweight BPF map that records the parent-child thread lineage established by `sys_clone`. It's simple, general-purpose, and useful well beyond log correlation. This post digs into the Linux thread model, why TID tracking matters for eBPF instrumentation, and several concrete use cases where the clone map pattern solves real problems.
 
-It works great — until your application uses a thread pool.
+## How Linux Models Threads
 
-## The Problem
+In Linux, there's no first-class "thread" concept at the kernel level. What you call a thread is just a `task_struct` that shares certain namespaces with its siblings — specifically the memory space (`CLONE_VM`), file descriptors (`CLONE_FILES`), and signal handlers.
 
-Most real-world applications don't do work on the thread that received the request. They hand it off to a pool of pre-spawned worker threads. A Java HTTP server accepts the connection on one thread and executes your handler on a Tomcat thread pool worker. A Go HTTP server goroutines-out the handler (less relevant — goroutines share the same OS TID within a P), but Java, Python's ThreadPoolExecutor, Node.js worker threads, and most native apps all exhibit this pattern.
+When you call `pthread_create`, under the hood it calls `clone(2)` with a set of flags that produce this sharing:
 
-Here's what that does to your TID-based span lookup:
+```
+clone(CLONE_VM | CLONE_FS | CLONE_FILES | CLONE_SIGHAND | CLONE_THREAD | ...)
+```
+
+The result is a new `task_struct` with its own **TID** (Thread ID, also called `pid` in kernel space) but sharing the **TGID** (Thread Group ID, also called `tgid`, which userspace calls the process ID).
+
+From eBPF, `bpf_get_current_pid_tgid()` returns a u64 where:
+- Upper 32 bits = TGID (the process ID userspace sees)
+- Lower 32 bits = TID (the specific thread ID)
+
+For the main thread of a process, TID == TGID. For every other thread in the process, TID differs from TGID but TGID is shared.
+
+This means: **TID is the finest-grained identity you can use to distinguish concurrent execution contexts in a process**. And that's exactly what makes thread pools painful.
+
+## The Thread Pool Problem
+
+Thread pools pre-spawn a fixed set of worker threads and reuse them across many requests. A typical web server:
+
+1. Main thread accepts connections
+2. Hands each request off to a thread pool worker (TID != main thread TID)
+3. Worker executes the handler and emits logs, metrics, traces
+
+In distributed tracing, a "span" tracks a unit of work. The span context (trace ID + span ID) needs to propagate with the work as it moves through threads. SDK-based tracing handles this via thread-local storage (Java's `ThreadLocal`, Python's `contextvars`) — the application explicitly propagates context when submitting work to the pool.
+
+eBPF-based automatic instrumentation has no such luxury. You're operating below the application level. When your probe fires on a thread pool worker, you have its TID. But the span context may have been registered under the request thread's TID — or under no TID at all, if the worker was pre-spawned before any request arrived.
 
 ![Thread pool context problem — TID miss](/images/blog/ebpf-clone-map-thread-pool/ebpf-clone-map-problem.svg)
 
-Your instrumentation registered the active span under the request thread's TID (say, 1001). The thread pool picks a worker (TID 1002) to handle the request. When that worker calls `write()` to emit a log line, your eBPF probe fires, calls `bpf_get_current_pid_tgid()` to get TID 1002, looks it up in `span_map` — and finds nothing. The log is emitted without any trace context. You're back to square one.
+This isn't just a log correlation problem. Any eBPF tool that needs to associate a kernel event (syscall, network packet, scheduler event) with application-level context runs into the same wall.
 
-This isn't a niche case. In any Java or Python service doing non-trivial work, it's the default.
+## Why TID Ancestry Matters
 
-## The Obvious Approach and Why It Breaks
+Here's the key observation: **thread pools are hierarchical**. Workers are spawned by a pool manager, which was spawned by the application main thread. When work is dispatched to a worker, the context we want is associated with the *logical* owner of that work — often traceable up the spawn lineage.
 
-The first instinct is to propagate span context into the thread pool itself. Have the instrumentation push the active span into each worker thread's map entry when work is dispatched. This is exactly what Java's `ThreadLocal` and MDC (Mapped Diagnostic Context) do in SDK-based approaches.
+Consider a few scenarios:
 
-But you're doing automatic instrumentation — no SDK, no code changes. You don't control the dispatch. And from BPF, you don't get a hook when user-space hands work to a thread pool. There's no "work dispatched to thread" event in the kernel.
+**Log-trace correlation.** Your log capture probe intercepts `write()` on a thread pool worker. The active span context lives in a BPF map keyed by the request handler thread's TID. The worker's TID misses. But the worker was spawned by a thread that *does* have span context, or its grandparent does.
 
-The other approach: put a uprobe on `pthread_create` or Java's thread dispatch code. But that requires per-language uprobes with symbol resolution, which is fragile and doesn't generalize.
+**eBPF tracer ↔ log TID mismatch.** You have a Go tracer registering spans under goroutine-pinned OS thread TIDs. A separate log capture probe fires on a different OS thread (thread pool worker). The two TIDs don't match — even though they're doing the same logical work. Walking the spawn tree finds the common ancestor.
 
-## The Clone Map Pattern
+**Scheduler event attribution.** You want to attribute CPU scheduling events (`sched_switch`) to the request they're serving. Workers are interchangeable and don't have per-request TIDs. But their spawn parent does — and you can walk up to find the context.
 
-Here's the key insight: when work is handed to a thread pool, those workers were originally *spawned* by something. The pool's threads were created via `clone()` (on Linux, that's what `pthread_create` ultimately calls). And `clone()` is a syscall — it's universally hookable.
+**Network packet attribution.** A network packet is processed on a kernel receive thread, then handed off via a queue to an application thread pool worker. The worker's TID misses your application context map. Parent chain lookup finds the owning thread.
 
-The idea: attach a `kretprobe` on `sys_clone`. Every time a new thread is created, record the parent→child TID relationship in an LRU BPF map. Then, when a TID lookup in the span map fails, walk up the parent chain until you find an ancestor with an active span.
+## The Clone Map
+
+The solution is to track the parent-child TID relationship established at spawn time.
+
+`sys_clone` is the syscall used for all thread creation on Linux (including Go's `runtime.newproc` path for goroutines when they pin an OS thread, and `pthread_create`). A `kretprobe` on `sys_clone` fires in the parent after the child is created. At that point:
+- `bpf_get_current_pid_tgid()` gives you the parent's TID
+- The return value `ret` is the child's TID (the parent sees the child's PID; the child sees 0)
+
+This gives you both sides of the relationship in one probe:
 
 ```c
-// clone_map.h
+SEC("kretprobe/sys_clone")
+int BPF_KRETPROBE(handle_clone_ret, long ret) {
+    if (ret <= 0) return 0;  // failed clone, or we're the child
 
+    u32 child_tid  = (u32)ret;
+    u32 parent_tid = (u32)(bpf_get_current_pid_tgid() & 0xFFFFFFFF);
+
+    bpf_map_update_elem(&clone_map, &child_tid, &parent_tid, BPF_ANY);
+    return 0;
+}
+```
+
+The map itself:
+
+```c
 struct {
     __uint(type, BPF_MAP_TYPE_LRU_HASH);
     __type(key, u32);    // Child TID
@@ -48,89 +93,54 @@ struct {
     __uint(max_entries, 10240);
 } clone_map SEC(".maps");
 
-// Walk up to 5 levels of parent chain. Covers most practical thread pool
-// hierarchies while keeping the BPF verifier happy.
 #define MAX_PARENT_CHAIN_LEVELS 5
 ```
 
-`BPF_MAP_TYPE_LRU_HASH` is the right choice here. Thread creation and destruction is frequent in long-running services. You want the map to automatically evict stale entries when it fills up, without any manual cleanup. LRU handles that.
+`BPF_MAP_TYPE_LRU_HASH` is the right choice: thread creation and destruction is frequent, and you want automatic eviction of stale entries rather than manual cleanup. Each entry is 8 bytes; 10240 entries covers ~10K live threads.
 
-Max entries at 10240 covers ~10K live threads simultaneously. Size this based on your workload; each entry is 8 bytes (two u32s).
+## Walking the Parent Chain
 
-## Populating the Map from kretprobe
-
-The `kretprobe/sys_clone` fires when `clone()` returns. The return value *is* the child TID (in the parent process; the child sees 0). Read it from the BPF context:
+In any probe where you need context and the direct TID lookup fails:
 
 ```c
-SEC("kretprobe/sys_clone")
-int BPF_KRETPROBE(handle_clone_ret, long ret) {
-    if (ret <= 0) {
-        return 0;  // clone failed or we're in the child
-    }
+u32 tid = (u32)(bpf_get_current_pid_tgid() & 0xFFFFFFFF);
+struct span_context *ctx = bpf_map_lookup_elem(&span_map, &tid);
 
-    u32 child_tid = (u32)ret;
-    u64 pid_tgid  = bpf_get_current_pid_tgid();
-    u32 parent_tid = (u32)(pid_tgid & 0xFFFFFFFF);
-
-    bpf_map_update_elem(&clone_map, &child_tid, &parent_tid, BPF_ANY);
-    return 0;
-}
-```
-
-One subtlety: `bpf_get_current_pid_tgid()` returns the *current* thread's pid_tgid — which in a kretprobe on clone is the *parent* thread making the clone call. The return value (`ret`) is the child TID. So this single probe call gives us both sides of the relationship.
-
-## Walking the Chain in the Log Capture Probe
-
-In your `sys_enter_write` tracepoint, after a span map miss, walk the clone_map:
-
-```c
-// In your sys_enter_write handler, after a miss on span_map:
-u32 current_tid = (u32)(bpf_get_current_pid_tgid() & 0xFFFFFFFF);
-struct span_context *span = NULL;
-
-// Try direct lookup first
-span = bpf_map_lookup_elem(&span_map, &current_tid);
-
-// On miss, walk up the parent chain
-if (!span) {
-    u32 tid = current_tid;
+if (!ctx) {
+    // Walk up the parent chain
+    u32 current = tid;
     for (int i = 0; i < MAX_PARENT_CHAIN_LEVELS; i++) {
-        u32 *parent = bpf_map_lookup_elem(&clone_map, &tid);
+        u32 *parent = bpf_map_lookup_elem(&clone_map, &current);
         if (!parent) break;
 
-        span = bpf_map_lookup_elem(&span_map, parent);
-        if (span) break;
+        ctx = bpf_map_lookup_elem(&span_map, parent);
+        if (ctx) break;
 
-        tid = *parent;
+        current = *parent;
     }
-}
-
-// Use span (may still be NULL if no ancestor has a span)
-if (span) {
-    // attach trace_id and span_id to log event
 }
 ```
 
-The bounded `for` loop with a compile-time constant (`MAX_PARENT_CHAIN_LEVELS = 5`) is what satisfies the BPF verifier. The verifier needs to prove the loop terminates. A runtime-variable bound would get rejected. Five levels is enough for any thread pool hierarchy I've encountered: spawner → pool manager → worker → sub-task → sub-sub-task. In practice, it's usually two hops.
+The bounded `for` loop with a compile-time constant is what the BPF verifier requires. A runtime-variable bound would be rejected. `MAX_PARENT_CHAIN_LEVELS = 5` is enough for any real thread pool hierarchy: spawner → pool manager → worker → sub-task → sub-sub-task. In practice, it's usually 1–2 hops.
 
 ![Clone map solution — parent chain walk](/images/blog/ebpf-clone-map-thread-pool/ebpf-clone-map-solution.svg)
 
-## Gotchas and Edge Cases
+## Gotchas
 
-**Short-lived threads:** If a thread pool worker is destroyed and a new worker is spawned with the same TID (TID reuse is possible on Linux), the clone_map could have a stale parent entry. LRU eviction helps, but this is a real edge case. In practice, TID reuse collisions within a typical observability window are rare. If you see spurious span correlations, this is worth investigating.
+**TID reuse.** Linux reuses TIDs after threads exit. If a stale clone_map entry maps a recycled TID to the wrong parent, you can get spurious context attribution. LRU eviction helps but doesn't eliminate this. In practice, TID reuse within a typical observability window is rare. For high-churn environments (thousands of thread spawns/second), add eager cleanup via a `sys_exit` hook.
 
-**Goroutines:** Go's M:N scheduler means goroutines don't always correspond to OS threads. For Go-native instrumentation, the TID-based approach works when goroutines are scheduled on their own OS thread (via `runtime.LockOSThread()`), but it won't work generally for goroutines. This pattern is most useful for Java and native threads.
+**Goroutines.** Go's M:N scheduler multiplexes goroutines onto OS threads (Ms). Goroutines don't have stable TIDs unless the goroutine calls `runtime.LockOSThread()`. For goroutine-level context in Go, you need a different approach (e.g., reading goroutine ID from the G struct via uprobe). The clone map works for Java, Python, C/C++, and any language using real POSIX threads.
 
-**Cleanup:** LRU handles eviction automatically when the map fills. But if you want to clean up eagerly when a process exits, you can hook `sys_exit_group` and delete entries for all TIDs belonging to that TGID.
+**Process fork.** `fork()` also goes through `clone()` (without `CLONE_THREAD`). Your kretprobe will record fork relationships too. This is usually harmless — you can filter by TGID if you only want intra-process thread relationships.
 
-**Performance:** Two additional BPF map lookups per log event (clone_map, then span_map again with parent). Both are O(1) hash lookups. The overhead is negligible compared to the cost of the ringbuf write.
+**Performance.** Two to five additional O(1) hash lookups per event. Negligible. The dominating cost is always the ring buffer write.
 
 ## When NOT to Use This
 
-If all your instrumentation is in a single BPF object and you control which TIDs get spans registered, you can often avoid this entirely by registering span context under the TGID (process ID) instead of the TID. All threads in a process share the same TGID. This only works if you have one active span per process at a time — fine for simple sequential services, wrong for anything concurrent.
+If you control all instrumentation in a single BPF object and all threads in a process share one logical context (e.g., a single-request-per-process model), keying by TGID instead of TID is simpler and avoids the chain walk entirely.
 
-The clone map pattern is the right tool when: you're doing automatic instrumentation with no control over application code, you're correlating across multiple independent BPF programs, and your target application uses real OS threads (not green threads/goroutines) for concurrency.
+The clone map earns its keep when: you're doing automatic instrumentation with no application code changes, you need to correlate events across independently developed BPF programs (different instrumentors for different languages), or your target application dispatches work across OS threads in ways that break TID-based context lookup.
 
 ---
 
-If this is useful, I'm doing more work in this space at [odigos-io/ebpf-core](https://github.com/odigos-io/ebpf-core) — automatic, zero-code-change observability via eBPF.
+The clone_map pattern is part of the eBPF instrumentation infrastructure in [odigos-io/ebpf-core](https://github.com/odigos-io/odigos) — automatic, zero-code-change observability via eBPF.
