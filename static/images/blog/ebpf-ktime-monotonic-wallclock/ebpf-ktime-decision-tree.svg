@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="380" font-family="monospace, sans-serif" font-size="13">
+  <rect width="780" height="380" fill="white"/>
+  <text x="390" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="#111">Which BPF Time Function Should You Use?</text>
+
+  <!-- Root question -->
+  <rect x="240" y="45" width="300" height="44" rx="6" fill="#f3e5f5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="390" y="63" text-anchor="middle" font-weight="bold" fill="#4A148C">Need wall-clock time?</text>
+  <text x="390" y="80" text-anchor="middle" fill="#4A148C" font-size="11">(correlate with traces, display to humans)</text>
+
+  <!-- No branch — deltas -->
+  <line x1="390" y1="89" x2="390" y2="109" stroke="#555" stroke-width="1.5"/>
+  <line x1="390" y1="109" x2="660" y2="109" stroke="#555" stroke-width="1.5"/>
+  <line x1="660" y1="109" x2="660" y2="129" stroke="#555" stroke-width="1.5" marker-end="url(#da)"/>
+  <text x="528" y="103" text-anchor="middle" fill="#555" font-size="11">No (measuring latency/duration)</text>
+
+  <rect x="560" y="132" width="200" height="50" rx="6" fill="#e8f5e9" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="660" y="152" text-anchor="middle" font-weight="bold" fill="#1B5E20">bpf_ktime_get_ns()</text>
+  <text x="660" y="169" text-anchor="middle" fill="#1B5E20" font-size="11">monotonic delta — correct</text>
+
+  <!-- Yes branch -->
+  <line x1="390" y1="89" x2="390" y2="109" stroke="#555" stroke-width="1.5"/>
+  <line x1="390" y1="109" x2="150" y2="109" stroke="#555" stroke-width="1.5"/>
+  <line x1="150" y1="109" x2="150" y2="129" stroke="#555" stroke-width="1.5" marker-end="url(#da)"/>
+  <text x="265" y="103" text-anchor="middle" fill="#555" font-size="11">Yes</text>
+
+  <!-- Sub-question: log/event stream? -->
+  <rect x="30" y="132" width="240" height="44" rx="6" fill="#f3e5f5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="150" y="150" text-anchor="middle" font-weight="bold" fill="#4A148C">Log / event stream?</text>
+  <text x="150" y="167" text-anchor="middle" fill="#4A148C" font-size="11">(ms-scale, OTel pipeline)</text>
+
+  <!-- Yes → time.Now() -->
+  <line x1="150" y1="176" x2="150" y2="196" stroke="#2196F3" stroke-width="1.5" marker-end="url(#db)"/>
+  <text x="160" y="190" fill="#2196F3" font-size="11">Yes</text>
+  <rect x="50" y="199" width="200" height="50" rx="6" fill="#e3f2fd" stroke="#2196F3" stroke-width="1.5"/>
+  <text x="150" y="219" text-anchor="middle" font-weight="bold" fill="#0D47A1">time.Now() at ringbuf</text>
+  <text x="150" y="236" text-anchor="middle" fill="#0D47A1" font-size="11">consumption ← simplest</text>
+
+  <!-- No → sub-question kernel version -->
+  <line x1="270" y1="154" x2="390" y2="154" stroke="#555" stroke-width="1.5" marker-end="url(#da)"/>
+  <text x="325" y="148" text-anchor="middle" fill="#555" font-size="11">No</text>
+
+  <rect x="290" y="132" width="200" height="44" rx="6" fill="#f3e5f5" stroke="#9C27B0" stroke-width="1.5"/>
+  <text x="390" y="150" text-anchor="middle" font-weight="bold" fill="#4A148C">Kernel ≥ 5.16?</text>
+  <text x="390" y="167" text-anchor="middle" fill="#4A148C" font-size="11">(check uname -r)</text>
+
+  <!-- Yes → bpf_ktime_get_real_ns -->
+  <line x1="390" y1="176" x2="390" y2="196" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#dc)"/>
+  <text x="400" y="190" fill="#4CAF50" font-size="11">Yes</text>
+  <rect x="290" y="199" width="200" height="50" rx="6" fill="#e8f5e9" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="390" y="219" text-anchor="middle" font-weight="bold" fill="#1B5E20">bpf_ktime_get_real_ns()</text>
+  <text x="390" y="236" text-anchor="middle" fill="#1B5E20" font-size="11">CLOCK_REALTIME in BPF</text>
+
+  <!-- No → offset calibration -->
+  <line x1="490" y1="154" x2="570" y2="154" stroke="#555" stroke-width="1.5"/>
+  <line x1="570" y1="154" x2="570" y2="199" stroke="#555" stroke-width="1.5" marker-end="url(#da)"/>
+  <text x="528" y="148" text-anchor="middle" fill="#555" font-size="11">No</text>
+
+  <rect x="490" y="199" width="220" height="62" rx="6" fill="#fff8e1" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="600" y="219" text-anchor="middle" font-weight="bold" fill="#E65100">Offset calibration</text>
+  <text x="600" y="236" text-anchor="middle" fill="#E65100" font-size="11">snapshot at load + store in map</text>
+  <text x="600" y="252" text-anchor="middle" fill="#E65100" font-size="11">re-calibrate every few mins</text>
+
+  <!-- Sub-ms note under offset -->
+  <text x="600" y="278" text-anchor="middle" fill="#9e9e9e" font-size="11">Drifts ~43ms/day at max NTP slew</text>
+  <text x="600" y="293" text-anchor="middle" fill="#9e9e9e" font-size="11">Acceptable for most use cases</text>
+
+  <!-- Note under time.Now -->
+  <text x="150" y="268" text-anchor="middle" fill="#9e9e9e" font-size="11">&lt;500µs latency vs probe fire</text>
+  <text x="150" y="283" text-anchor="middle" fill="#9e9e9e" font-size="11">Matches OTel observed_timestamp</text>
+
+  <!-- Note under real_ns -->
+  <text x="390" y="268" text-anchor="middle" fill="#9e9e9e" font-size="11">Can go backward on NTP step</text>
+  <text x="390" y="283" text-anchor="middle" fill="#9e9e9e" font-size="11">Pair with ktime for ordering</text>
+
+  <!-- bpf_ktime_get_ns note -->
+  <text x="660" y="198" text-anchor="middle" fill="#9e9e9e" font-size="11">Never use for wall-clock.</text>
+  <text x="660" y="213" text-anchor="middle" fill="#9e9e9e" font-size="11">Deltas only.</text>
+
+  <defs>
+    <marker id="da" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#555"/></marker>
+    <marker id="db" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#2196F3"/></marker>
+    <marker id="dc" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#4CAF50"/></marker>
+  </defs>
+</svg>

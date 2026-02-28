@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="400" font-family="monospace, sans-serif" font-size="13">
+  <rect width="860" height="400" fill="white"/>
+  <text x="430" y="28" text-anchor="middle" font-size="15" font-weight="bold" fill="#111">Three Approaches to Timestamps in eBPF Log Capture</text>
+
+  <!-- Approach 1: Offset calibration -->
+  <rect x="20" y="48" width="250" height="230" rx="6" fill="#fff8e1" stroke="#FF9800" stroke-width="1.5"/>
+  <text x="145" y="70" text-anchor="middle" font-weight="bold" fill="#E65100">Offset Calibration</text>
+  <text x="145" y="88" text-anchor="middle" fill="#E65100" font-size="11">Any kernel</text>
+
+  <rect x="35" y="98" width="220" height="40" rx="4" fill="#fff3e0" stroke="#FFB74D" stroke-width="1"/>
+  <text x="145" y="114" text-anchor="middle" fill="#BF360C" font-size="11">At load: snapshot ktime + wall,</text>
+  <text x="145" y="129" text-anchor="middle" fill="#BF360C" font-size="11">compute offset → store in map</text>
+
+  <line x1="145" y1="138" x2="145" y2="155" stroke="#FF9800" stroke-width="1.5" marker-end="url(#ao)"/>
+
+  <rect x="35" y="158" width="220" height="30" rx="4" fill="#fff3e0" stroke="#FFB74D" stroke-width="1"/>
+  <text x="145" y="178" text-anchor="middle" fill="#BF360C" font-size="11">BPF: ktime_ns + offset → wall_ns</text>
+
+  <line x1="145" y1="188" x2="145" y2="205" stroke="#FF9800" stroke-width="1.5" marker-end="url(#ao)"/>
+
+  <rect x="35" y="208" width="220" height="55" rx="4" fill="#fff3e0" stroke="#FFB74D" stroke-width="1"/>
+  <text x="145" y="225" text-anchor="middle" fill="#4CAF50" font-size="11">✓ Works on old kernels</text>
+  <text x="145" y="241" text-anchor="middle" fill="#4CAF50" font-size="11">✓ BPF-side timestamp</text>
+  <text x="145" y="257" text-anchor="middle" fill="#F44336" font-size="11">✗ Drifts with NTP slew</text>
+
+  <!-- Approach 2: bpf_ktime_get_real_ns -->
+  <rect x="305" y="48" width="250" height="230" rx="6" fill="#e8f5e9" stroke="#4CAF50" stroke-width="1.5"/>
+  <text x="430" y="70" text-anchor="middle" font-weight="bold" fill="#1B5E20">bpf_ktime_get_real_ns()</text>
+  <text x="430" y="88" text-anchor="middle" fill="#1B5E20" font-size="11">Kernel ≥ 5.16</text>
+
+  <rect x="320" y="98" width="220" height="40" rx="4" fill="#f1f8e9" stroke="#AED581" stroke-width="1"/>
+  <text x="430" y="114" text-anchor="middle" fill="#33691E" font-size="11">BPF: CLOCK_REALTIME directly</text>
+  <text x="430" y="129" text-anchor="middle" fill="#33691E" font-size="11">no maps, no offset</text>
+
+  <line x1="430" y1="138" x2="430" y2="155" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#ag)"/>
+
+  <rect x="320" y="158" width="220" height="30" rx="4" fill="#f1f8e9" stroke="#AED581" stroke-width="1"/>
+  <text x="430" y="178" text-anchor="middle" fill="#33691E" font-size="11">Timestamp = wall-clock, always</text>
+
+  <line x1="430" y1="188" x2="430" y2="205" stroke="#4CAF50" stroke-width="1.5" marker-end="url(#ag)"/>
+
+  <rect x="320" y="208" width="220" height="55" rx="4" fill="#f1f8e9" stroke="#AED581" stroke-width="1"/>
+  <text x="430" y="225" text-anchor="middle" fill="#4CAF50" font-size="11">✓ Accurate wall-clock</text>
+  <text x="430" y="241" text-anchor="middle" fill="#4CAF50" font-size="11">✓ No drift</text>
+  <text x="430" y="257" text-anchor="middle" fill="#F44336" font-size="11">✗ Kernel 5.16+ only</text>
+
+  <!-- Approach 3: time.Now() -->
+  <rect x="590" y="48" width="250" height="230" rx="6" fill="#e3f2fd" stroke="#2196F3" stroke-width="1.5"/>
+  <text x="715" y="70" text-anchor="middle" font-weight="bold" fill="#0D47A1">time.Now() in Userspace</text>
+  <text x="715" y="88" text-anchor="middle" fill="#0D47A1" font-size="11">Any kernel — recommended for logs</text>
+
+  <rect x="605" y="98" width="220" height="40" rx="4" fill="#e1f5fe" stroke="#81D4FA" stroke-width="1"/>
+  <text x="715" y="114" text-anchor="middle" fill="#01579B" font-size="11">BPF: no timestamp, just emit event</text>
+  <text x="715" y="129" text-anchor="middle" fill="#01579B" font-size="11">Userspace: time.Now() on consume</text>
+
+  <line x1="715" y1="138" x2="715" y2="155" stroke="#2196F3" stroke-width="1.5" marker-end="url(#ab)"/>
+
+  <rect x="605" y="158" width="220" height="30" rx="4" fill="#e1f5fe" stroke="#81D4FA" stroke-width="1"/>
+  <text x="715" y="178" text-anchor="middle" fill="#01579B" font-size="11">CLOCK_REALTIME at consumption</text>
+
+  <line x1="715" y1="188" x2="715" y2="205" stroke="#2196F3" stroke-width="1.5" marker-end="url(#ab)"/>
+
+  <rect x="605" y="208" width="220" height="55" rx="4" fill="#e1f5fe" stroke="#81D4FA" stroke-width="1"/>
+  <text x="715" y="225" text-anchor="middle" fill="#4CAF50" font-size="11">✓ Accurate wall-clock</text>
+  <text x="715" y="241" text-anchor="middle" fill="#4CAF50" font-size="11">✓ Any kernel, zero BPF overhead</text>
+  <text x="715" y="257" text-anchor="middle" fill="#FF9800" font-size="11">~ &lt;500µs observed latency</text>
+
+  <!-- Use case row -->
+  <text x="145" y="302" text-anchor="middle" fill="#795548" font-size="12" font-weight="bold">Best for:</text>
+  <text x="145" y="318" text-anchor="middle" fill="#795548" font-size="11">Ordering kernel events,</text>
+  <text x="145" y="334" text-anchor="middle" fill="#795548" font-size="11">old kernel support</text>
+
+  <text x="430" y="302" text-anchor="middle" fill="#2E7D32" font-size="12" font-weight="bold">Best for:</text>
+  <text x="430" y="318" text-anchor="middle" fill="#2E7D32" font-size="11">New kernels, precision</text>
+  <text x="430" y="334" text-anchor="middle" fill="#2E7D32" font-size="11">wall-clock in probe</text>
+
+  <text x="715" y="302" text-anchor="middle" fill="#1565C0" font-size="12" font-weight="bold">Best for:</text>
+  <text x="715" y="318" text-anchor="middle" fill="#1565C0" font-size="11">Log capture, event streams,</text>
+  <text x="715" y="334" text-anchor="middle" fill="#1565C0" font-size="11">OTel log pipelines ← use this</text>
+
+  <!-- Caption -->
+  <text x="430" y="375" text-anchor="middle" fill="#757575" font-size="11">Ring buffer consumption latency is typically 10µs–500µs — noise relative to trace span durations (ms scale).</text>
+  <text x="430" y="392" text-anchor="middle" fill="#757575" font-size="11">For logs, time.Now() at consumption matches OTel's observed_timestamp semantics exactly.</text>
+
+  <defs>
+    <marker id="ao" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#FF9800"/></marker>
+    <marker id="ag" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#4CAF50"/></marker>
+    <marker id="ab" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L0,6 L8,3 z" fill="#2196F3"/></marker>
+  </defs>
+</svg>
