@@ -6,9 +6,9 @@ tags = ["ebpf", "observability", "timestamps", "debugging"]
 type = "post"
 +++
 
-When you write your first eBPF log capture tool, timestamping log events feels trivial. Call `bpf_ktime_get_ns()`, store the result in your event struct, ship it out the ring buffer. Done.
+When you write your first eBPF tool — whether it's capturing logs, emitting performance events, generating security alerts, or building an observability pipeline — timestamping events feels trivial. Call `bpf_ktime_get_ns()`, store the result in your event struct, ship it out the ring buffer. Done.
 
-Then you try to correlate those logs with traces and discover the timestamps are nonsense — off by days, weeks, or the entire uptime of the machine. The numbers are technically precise; they're just measuring the wrong thing.
+Then you try to correlate those events with the outside world and discover the timestamps are nonsense — off by days, weeks, or the entire uptime of the machine. The numbers are technically precise; they're just measuring the wrong thing.
 
 This post traces `bpf_ktime_get_ns()` all the way down to the kernel clock source, explains three approaches to getting usable wall-clock time in eBPF, and builds a decision tree for which one to use.
 
@@ -171,4 +171,4 @@ For log capture on any kernel: **time.Now() at consumption**. You get wall-clock
 
 ---
 
-The timestamping approach described here is part of the log capture implementation in [odigos-io/ebpf-core](https://github.com/odigos-io/ebpf-core).
+The timestamping approach described here is part of the eBPF instrumentation work happening at [odigos-io](https://github.com/odigos-io).
